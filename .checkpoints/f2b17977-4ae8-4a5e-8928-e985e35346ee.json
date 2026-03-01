@@ -1,0 +1,29 @@
+{
+  "session_id": "f2b17977-4ae8-4a5e-8928-e985e35346ee",
+  "current_phase": "procurement",
+  "start_time": "2026-02-28T21:07:55.424324",
+  "end_time": null,
+  "last_activity": "2026-02-28T21:07:55.426828",
+  "technician_id": "tech-002",
+  "site_id": "site-dc-002",
+  "diagnosis_state": {
+    "success": true,
+    "confidence": 0.88,
+    "issue_type": "electrical_malfunction",
+    "severity": "critical",
+    "root_cause": "High voltage arcing in main breaker",
+    "requires_parts": true
+  },
+  "procurement_state": null,
+  "guidance_state": null,
+  "escalations": [],
+  "metadata": {
+    "phase_transitions": [
+      {
+        "from_phase": "intake",
+        "to_phase": "diagnosis",
+        "timestamp": "2026-02-28T21:07:55.424341"
+      }
+    ]
+  }
+}

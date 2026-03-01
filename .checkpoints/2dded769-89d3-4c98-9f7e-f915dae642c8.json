@@ -1,0 +1,51 @@
+{
+  "session_id": "2dded769-89d3-4c98-9f7e-f915dae642c8",
+  "current_phase": "completion",
+  "start_time": "2026-02-28T21:20:39.448250",
+  "end_time": "2026-02-28T21:20:39.452302",
+  "last_activity": "2026-02-28T21:20:39.452302",
+  "technician_id": "tech-001",
+  "site_id": "site-dc-001",
+  "diagnosis_state": {
+    "success": true,
+    "confidence": 0.92,
+    "issue_type": "hardware_defect",
+    "severity": "high",
+    "root_cause": "Power supply failure",
+    "requires_parts": true,
+    "recommended_parts": [
+      "power-supply-cisco-c9300-pwr-750w"
+    ]
+  },
+  "procurement_state": {
+    "success": true,
+    "parts": [
+      {
+        "part_id": "power-supply-cisco-c9300-pwr-750w",
+        "quantity": 1
+      }
+    ],
+    "total_cost": 450.0,
+    "purchase_order_id": "PO-2026-001"
+  },
+  "guidance_state": {
+    "success": true,
+    "repair_steps": [
+      "1. Power down the switch",
+      "2. Remove failed power supply",
+      "3. Install new power supply",
+      "4. Power on and verify"
+    ],
+    "repair_complete": true
+  },
+  "escalations": [],
+  "metadata": {
+    "phase_transitions": [
+      {
+        "from_phase": "intake",
+        "to_phase": "diagnosis",
+        "timestamp": "2026-02-28T21:20:39.448261"
+      }
+    ]
+  }
+}

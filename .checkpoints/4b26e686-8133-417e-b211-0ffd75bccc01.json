@@ -1,0 +1,30 @@
+{
+  "session_id": "4b26e686-8133-417e-b211-0ffd75bccc01",
+  "current_phase": "guidance",
+  "start_time": "2026-02-28T19:29:59.686758",
+  "end_time": null,
+  "last_activity": "2026-02-28T19:29:59.687506",
+  "technician_id": "tech-003",
+  "site_id": "site-office-001",
+  "diagnosis_state": {
+    "success": true,
+    "confidence": 0.65,
+    "issue_type": "hardware_defect",
+    "severity": "medium",
+    "root_cause": "Possible fan bearing failure",
+    "escalation_required": true,
+    "escalation_reason": "Low confidence. Additional photos recommended."
+  },
+  "procurement_state": null,
+  "guidance_state": null,
+  "escalations": [],
+  "metadata": {
+    "phase_transitions": [
+      {
+        "from_phase": "intake",
+        "to_phase": "diagnosis",
+        "timestamp": "2026-02-28T19:29:59.686771"
+      }
+    ]
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "session_id": "246e6013-0bb8-453b-8ff3-a6e92266b9fd",
+  "current_phase": "procurement",
+  "start_time": "2026-02-28T21:20:45.927378",
+  "end_time": null,
+  "last_activity": "2026-02-28T21:20:45.929701",
+  "technician_id": "tech-003",
+  "site_id": "site-office-001",
+  "diagnosis_state": {
+    "success": true,
+    "confidence": 0.92,
+    "issue_type": "hardware_defect",
+    "severity": "medium",
+    "root_cause": "Fan bearing failure confirmed",
+    "requires_parts": true
+  },
+  "procurement_state": null,
+  "guidance_state": null,
+  "escalations": [],
+  "metadata": {
+    "phase_transitions": [
+      {
+        "from_phase": "intake",
+        "to_phase": "diagnosis",
+        "timestamp": "2026-02-28T21:20:45.927390"
+      }
+    ]
+  }
+}

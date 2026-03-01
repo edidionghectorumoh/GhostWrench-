@@ -1,0 +1,32 @@
+{
+  "session_id": "48577b28-11fd-4ebd-9f57-6901fd44f152",
+  "current_phase": "procurement",
+  "start_time": "2026-02-28T21:22:20.576202",
+  "end_time": null,
+  "last_activity": "2026-02-28T21:22:20.577587",
+  "technician_id": "tech-001",
+  "site_id": "site-dc-001",
+  "diagnosis_state": {
+    "success": true,
+    "confidence": 0.92,
+    "issue_type": "hardware_defect",
+    "severity": "high",
+    "root_cause": "Power supply failure",
+    "requires_parts": true,
+    "recommended_parts": [
+      "power-supply-cisco-c9300-pwr-750w"
+    ]
+  },
+  "procurement_state": null,
+  "guidance_state": null,
+  "escalations": [],
+  "metadata": {
+    "phase_transitions": [
+      {
+        "from_phase": "intake",
+        "to_phase": "diagnosis",
+        "timestamp": "2026-02-28T21:22:20.576220"
+      }
+    ]
+  }
+}

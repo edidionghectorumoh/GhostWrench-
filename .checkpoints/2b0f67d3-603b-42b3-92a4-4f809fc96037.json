@@ -1,0 +1,22 @@
+{
+  "session_id": "2b0f67d3-603b-42b3-92a4-4f809fc96037",
+  "current_phase": "diagnosis",
+  "start_time": "2026-02-28T21:03:05.589710",
+  "end_time": null,
+  "last_activity": "2026-02-28T21:03:05.589776",
+  "technician_id": "tech-001",
+  "site_id": "site-dc-001",
+  "diagnosis_state": null,
+  "procurement_state": null,
+  "guidance_state": null,
+  "escalations": [],
+  "metadata": {
+    "phase_transitions": [
+      {
+        "from_phase": "intake",
+        "to_phase": "diagnosis",
+        "timestamp": "2026-02-28T21:03:05.589771"
+      }
+    ]
+  }
+}
