@@ -1,0 +1,153 @@
+/**
+ * Bioluminescent Theme System
+ * Sturdivant AI Lab Visual Identity
+ * 
+ * Inspired by deep-sea bioluminescence and stigmergy-based visualization.
+ * Implements glowing nodes, pulsing animations, and fading resource trails.
+ */
+
+:root {
+    /* Color Palette */
+    --primary-glow: #00d4ff;
+    --secondary-glow: #16c79a;
+    --urgent-pulse: #e94560;
+    --background-dark: #0f0f1e;
+    --surface-dark: #1a1a2e;
+    --trail-fade: #533483;
+    
+    /* Animation Timings */
+    --glow-duration: 2s;
+    --pulse-duration: 1.5s;
+    --trail-fade-duration: 3s;
+    --ease-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Node Glow Effect - Soft cyan outer glow for resource nodes */
+.node-glow {
+    box-shadow: 
+        0 0 10px var(--primary-glow),
+        0 0 20px var(--primary-glow),
+        0 0 40px var(--primary-glow);
+    animation: glow var(--glow-duration) var(--ease-function) infinite alternate;
+    border-radius: 50%;
+}
+
+@keyframes glow {
+    from {
+        box-shadow: 
+            0 0 10px var(--primary-glow),
+            0 0 20px var(--primary-glow);
+    }
+    to {
+        box-shadow: 
+            0 0 20px var(--primary-glow),
+            0 0 40px var(--primary-glow),
+            0 0 60px var(--primary-glow);
+    }
+}
+
+/* Ripple Pulse Effect - Expanding ring animation for active resources */
+.ripple-pulse {
+    position: relative;
+    display: inline-block;
+}
+
+.ripple-pulse::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 100%;
+    height: 100%;
+    border: 2px solid var(--primary-glow);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    animation: ripple var(--pulse-duration) var(--ease-function) infinite;
+}
+
+@keyframes ripple {
+    0% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 1;
+    }
+    100% {
+        transform: translate(-50%, -50%) scale(2.5);
+        opacity: 0;
+    }
+}
+
+/* Trail Fade Effect - Fading resource trails for stigmergy visualization */
+.trail-fade {
+    animation: trail var(--trail-fade-duration) var(--ease-function) forwards;
+}
+
+@keyframes trail {
+    0% {
+        opacity: 1;
+        filter: brightness(1.5);
+    }
+    100% {
+        opacity: 0;
+        filter: brightness(0.5);
+    }
+}
+
+/* Urgent Node Styling - Red pulsing for high-urgency cases */
+.node-urgent {
+    box-shadow: 
+        0 0 15px var(--urgent-pulse),
+        0 0 30px var(--urgent-pulse);
+    animation: urgent-pulse var(--pulse-duration) var(--ease-function) infinite;
+}
+
+@keyframes urgent-pulse {
+    0%, 100% {
+        box-shadow: 
+            0 0 15px var(--urgent-pulse),
+            0 0 30px var(--urgent-pulse);
+    }
+    50% {
+        box-shadow: 
+            0 0 25px var(--urgent-pulse),
+            0 0 50px var(--urgent-pulse),
+            0 0 75px var(--urgent-pulse);
+    }
+}
+
+/* Success Glow - Teal glow for resolved cases */
+.node-success {
+    box-shadow: 
+        0 0 10px var(--secondary-glow),
+        0 0 20px var(--secondary-glow);
+}
+
+/* Dark Mode Surface Styling */
+.surface-card {
+    background-color: var(--surface-dark);
+    border: 1px solid rgba(0, 212, 255, 0.2);
+    border-radius: 8px;
+    padding: 1rem;
+    transition: all 0.3s var(--ease-function);
+}
+
+.surface-card:hover {
+    border-color: var(--primary-glow);
+    box-shadow: 0 0 15px rgba(0, 212, 255, 0.3);
+}
+
+/* Streamlit-specific overrides for dark theme */
+.stApp {
+    background-color: var(--background-dark);
+}
+
+.stMetric {
+    background-color: var(--surface-dark);
+    padding: 1rem;
+    border-radius: 8px;
+    border: 1px solid rgba(0, 212, 255, 0.2);
+}
+
+.stChatMessage {
+    background-color: var(--surface-dark);
+    border-left: 3px solid var(--primary-glow);
+}
