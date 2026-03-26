@@ -1,0 +1,470 @@
+openapi: 3.0.3
+info:
+  title: Autonomous Field Engineer API
+  description: |
+    REST API for the Autonomous Field Engineer system. This API enables field technicians 
+    to submit diagnosis requests, track workflow progress, and receive repair guidance.
+    
+    The system uses a multi-agent architecture with Amazon Bedrock (Nova Pro, Nova Act, Nova Sonic)
+    for AI capabilities and a cloud-based judge for validation.
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@example.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+  - url: https://api.example.com
+    description: Production server
+
+tags:
+  - name: Diagnosis
+    description: Equipment diagnosis operations
+  - name: Workflow
+    description: Workflow state management
+  - name: Guidance
+    description: Repair guidance operations
+  - name: Health
+    description: System health and monitoring
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      description: Check if the orchestration service is running and healthy
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  timestamp:
+                    type: string
+                    format: date-time
+                  version:
+                    type: string
+                    example: 1.0.0
+        '503':
+          description: Service is unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/diagnosis:
+    post:
+      summary: Submit diagnosis request
+      description: |
+        Submit an equipment photo and site context for AI-powered diagnosis.
+        The system will analyze the image, identify issues, and provide recommendations.
+      tags:
+        - Diagnosis
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - image
+                - site_id
+                - technician_id
+              properties:
+                image:
+                  type: string
+                  format: binary
+                  description: Equipment photo (JPEG, PNG)
+                site_id:
+                  type: string
+                  description: Site identifier
+                  example: site-001
+                technician_id:
+                  type: string
+                  description: Technician identifier
+                  example: tech-001
+                component_id:
+                  type: string
+                  description: Component identifier (optional)
+                  example: switch-rack-a-01
+                description:
+                  type: string
+                  description: Issue description (optional)
+                  example: Network switch showing error lights
+      responses:
+        '200':
+          description: Diagnosis request accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiagnosisResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/workflow/{session_id}:
+    get:
+      summary: Get workflow state
+      description: Retrieve the current state of a workflow session
+      tags:
+        - Workflow
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Workflow session ID
+          example: session-20260228103045
+      responses:
+        '200':
+          description: Workflow state retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowState'
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/workflow/{session_id}/status:
+    get:
+      summary: Get workflow status
+      description: Get a simplified status summary of the workflow
+      tags:
+        - Workflow
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Workflow session ID
+      responses:
+        '200':
+          description: Workflow status retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  session_id:
+                    type: string
+                  current_phase:
+                    type: string
+                    enum: [intake, diagnosis, procurement, guidance, completion]
+                  status:
+                    type: string
+                    enum: [in_progress, paused, completed, failed]
+                  started_at:
+                    type: string
+                    format: date-time
+                  last_activity:
+                    type: string
+                    format: date-time
+
+  /api/v1/guidance/{session_id}:
+    get:
+      summary: Get repair guidance
+      description: Retrieve step-by-step repair guidance for a diagnosed issue
+      tags:
+        - Guidance
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Workflow session ID
+      responses:
+        '200':
+          description: Guidance retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GuidanceResponse'
+        '404':
+          description: Session not found or guidance not available
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/guidance/{session_id}/step:
+    post:
+      summary: Advance to next step
+      description: Mark current step as complete and get the next repair step
+      tags:
+        - Guidance
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Workflow session ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                step_completed:
+                  type: boolean
+                  description: Whether the current step was completed successfully
+                notes:
+                  type: string
+                  description: Optional notes about the step
+      responses:
+        '200':
+          description: Next step retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GuidanceStep'
+
+  /api/v1/escalations:
+    get:
+      summary: List active escalations
+      description: Get all active escalations for the current user or system
+      tags:
+        - Workflow
+      parameters:
+        - name: technician_id
+          in: query
+          schema:
+            type: string
+          description: Filter by technician ID
+        - name: severity
+          in: query
+          schema:
+            type: string
+            enum: [low, medium, high, critical]
+          description: Filter by severity level
+      responses:
+        '200':
+          description: Escalations retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  escalations:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Escalation'
+
+components:
+  schemas:
+    DiagnosisResponse:
+      type: object
+      properties:
+        session_id:
+          type: string
+          description: Unique session identifier
+          example: session-20260228103045
+        success:
+          type: boolean
+          description: Whether the diagnosis was successful
+        message:
+          type: string
+          description: Human-readable message
+        data:
+          type: object
+          properties:
+            issue_type:
+              type: string
+              enum: [hardware_defect, installation_error, network_failure, electrical_malfunction, environmental]
+              description: Type of issue identified
+            confidence:
+              type: number
+              format: float
+              minimum: 0
+              maximum: 1
+              description: Confidence score (0-1)
+              example: 0.92
+            description:
+              type: string
+              description: Detailed issue description
+            recommended_actions:
+              type: array
+              items:
+                type: string
+              description: Recommended repair actions
+            requires_parts:
+              type: boolean
+              description: Whether replacement parts are needed
+            estimated_repair_time:
+              type: integer
+              description: Estimated repair time in minutes
+        next_phase:
+          type: string
+          enum: [intake, diagnosis, procurement, guidance, completion]
+          description: Next workflow phase
+
+    WorkflowState:
+      type: object
+      properties:
+        session_id:
+          type: string
+        current_phase:
+          type: string
+          enum: [intake, diagnosis, procurement, guidance, completion]
+        status:
+          type: string
+          enum: [in_progress, paused, completed, failed]
+        technician_id:
+          type: string
+        site_id:
+          type: string
+        start_time:
+          type: string
+          format: date-time
+        last_activity:
+          type: string
+          format: date-time
+        diagnosis_state:
+          type: object
+          description: Diagnosis results
+        procurement_state:
+          type: object
+          description: Procurement details
+        guidance_state:
+          type: object
+          description: Guidance information
+        escalations:
+          type: array
+          items:
+            $ref: '#/components/schemas/Escalation'
+
+    GuidanceResponse:
+      type: object
+      properties:
+        session_id:
+          type: string
+        success:
+          type: boolean
+        repair_guide:
+          type: object
+          properties:
+            title:
+              type: string
+              example: Network Switch Replacement Procedure
+            total_steps:
+              type: integer
+              example: 8
+            estimated_duration:
+              type: integer
+              description: Estimated duration in minutes
+              example: 45
+            skill_level:
+              type: string
+              enum: [novice, intermediate, expert]
+            steps:
+              type: array
+              items:
+                $ref: '#/components/schemas/GuidanceStep'
+
+    GuidanceStep:
+      type: object
+      properties:
+        step_number:
+          type: integer
+          example: 1
+        title:
+          type: string
+          example: Power down equipment
+        description:
+          type: string
+          example: Safely power down the network switch using the power button
+        safety_notes:
+          type: array
+          items:
+            type: string
+          example: ["Ensure proper grounding", "Wear ESD wrist strap"]
+        required_tools:
+          type: array
+          items:
+            type: string
+          example: ["Phillips screwdriver", "Cable tester"]
+        estimated_duration:
+          type: integer
+          description: Step duration in minutes
+          example: 5
+        images:
+          type: array
+          items:
+            type: string
+            format: uri
+          description: Reference images for this step
+
+    Escalation:
+      type: object
+      properties:
+        escalation_id:
+          type: string
+          example: esc-abc123
+        escalation_type:
+          type: string
+          enum: [low_confidence, safety_violation, budget_exceeded, delivery_delay]
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        description:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        resolved_at:
+          type: string
+          format: date-time
+          nullable: true
+        status:
+          type: string
+          enum: [active, resolved, cancelled]
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+        code:
+          type: string
+          description: Error code
+        details:
+          type: object
+          description: Additional error details
+
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for authentication
+
+security:
+  - ApiKeyAuth: []

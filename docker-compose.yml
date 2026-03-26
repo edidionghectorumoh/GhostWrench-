@@ -1,0 +1,142 @@
+version: '3.8'
+
+services:
+  # Weaviate Vector Database for RAG System
+  weaviate:
+    image: cr.weaviate.io/semitechnologies/weaviate:1.27.0
+    container_name: afe-weaviate
+    ports:
+      - "8080:8080"   # HTTP API
+      - "50051:50051" # gRPC API
+    environment:
+      # Authentication
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
+      
+      # Persistence
+      PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
+      
+      # Query defaults
+      QUERY_DEFAULTS_LIMIT: 25
+      QUERY_MAXIMUM_RESULTS: 10000
+      
+      # Disable modules (we provide our own embeddings)
+      ENABLE_MODULES: ''
+      
+      # Cluster configuration
+      CLUSTER_HOSTNAME: 'node1'
+      
+      # Performance tuning for Linux laptop
+      LIMIT_RESOURCES: 'true'
+      GOMEMLIMIT: '2GiB'
+    volumes:
+      - weaviate_data:/var/lib/weaviate
+    # Linux-specific resource limits to keep laptop responsive
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'      # Max 2 CPU cores
+          memory: 2G       # Max 2GB RAM
+        reservations:
+          cpus: '0.5'      # Min 0.5 CPU cores
+          memory: 512M     # Min 512MB RAM
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/v1/.well-known/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - afe_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Orchestration Layer Service
+  orchestration:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: afe-orchestration
+    ports:
+      - "8000:8000"
+    environment:
+      # AWS Credentials (set these in .env file)
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+      
+      # Weaviate Configuration
+      WEAVIATE_URL: http://weaviate:8080
+      
+      # Application Configuration
+      ENABLE_VALIDATION: ${ENABLE_VALIDATION:-true}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      
+      # Database Configuration
+      AUDIT_LOG_PATH: /app/audit_logs/judgments.db
+      CHECKPOINT_PATH: /app/.checkpoints
+      
+      # Structured logging for agent reasoning
+      ENABLE_THOUGHT_LOGGING: ${ENABLE_THOUGHT_LOGGING:-true}
+      THOUGHT_LOG_PATH: /app/logs/agent_thoughts.jsonl
+    volumes:
+      - ./audit_logs:/app/audit_logs
+      - ./.checkpoints:/app/.checkpoints
+      - ./logs:/app/logs  # Persistent logs for agent reasoning
+      - ./src:/app/src
+      - ./config.py:/app/config.py
+    # Resource limits for orchestration layer
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+    depends_on:
+      weaviate:
+        condition: service_healthy
+      logging:
+        condition: service_started
+    networks:
+      - afe_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # Structured Logging Service (Thought-Action-Observation recorder)
+  logging:
+    image: busybox:latest
+    container_name: afe-logging
+    command: tail -f /dev/null  # Keep container running
+    volumes:
+      - ./logs:/logs
+    networks:
+      - afe_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  weaviate_data:
+    driver: local
+
+networks:
+  afe_network:
+    driver: bridge

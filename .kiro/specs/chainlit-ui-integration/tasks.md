@@ -1,0 +1,308 @@
+# Implementation Plan: Chainlit UI Integration & Nova 2 Model Upgrade
+
+## Overview
+
+Incremental implementation of the Chainlit web UI and Nova 2 model upgrades for the Ghostwrench AFE system. Tasks progress from config/model changes (backend-first) through the Chainlit presentation layer, mock portal, demo mode, and finally testing. Each task builds on the previous, ensuring no orphaned code.
+
+## Tasks
+
+- [x] 1. Update config.py with Nova 2 model IDs and update requirements.txt
+  - [x] 1.1 Add Nova 2 Lite, Nova Multimodal Embeddings, and Nova 2 Sonic model ID constants to `config.py`
+    - Add `NOVA_2_LITE_MODEL_ID = "us.amazon.nova-2-lite-v1:0"`
+    - Add `NOVA_MULTIMODAL_EMBEDDINGS_MODEL_ID = "amazon.nova-2-multimodal-embeddings-v1:0"`
+    - Add `NOVA_2_SONIC_MODEL_ID = "amazon.nova-2-sonic-v1:0"`
+    - Add `EMBEDDING_DIMENSION = 1024`
+    - Update `MODEL_CONFIG` dict to include `nova_2_lite` and `nova_multimodal_embeddings` entries
+    - _Requirements: 10.1, 11.1_
+  - [x] 1.2 Update `requirements.txt` to add chainlit and remove sentence-transformers
+    - Add `chainlit>=1.0.0` dependency
+    - Remove `sentence-transformers>=2.2.0` line
+    - _Requirements: 9.1, 11.5_
+
+- [x] 2. Migrate DiagnosisAgent to Nova 2 Lite via Converse API
+  - [x] 2.1 Update `src/agents/DiagnosisAgent.py` `_call_nova_pro` method to use Bedrock Converse API with Nova 2 Lite
+    - Replace `invoke_model` call with `bedrock.converse()` call
+    - Use `modelId="us.amazon.nova-2-lite-v1:0"` from config
+    - Build `content` list with image content block (format + source.bytes) when image_data is provided, followed by text content block
+    - Use `inferenceConfig` with `maxTokens` and `temperature` parameters
+    - Parse response from `response["output"]["message"]["content"][0]["text"]`
+    - _Requirements: 10.2, 10.4_
+  - [ ]* 2.2 Write property test for DiagnosisAgent Converse API request construction
+    - **Property 14: DiagnosisAgent Converse API request construction**
+    - **Validates: Requirements 10.2, 10.4**
+
+- [x] 3. Migrate CloudJudge to Nova 2 Lite model ID
+  - [x] 3.1 Update `src/judge/cloud_judge.py` `_call_nova` method to use Nova 2 Lite via Converse API
+    - Replace `invoke_model` with `bedrock.converse()` for text-only calls
+    - Use `modelId="us.amazon.nova-2-lite-v1:0"` from config
+    - _Requirements: 10.3_
+  - [ ]* 3.2 Write property test for CloudJudge Nova 2 Lite model ID
+    - **Property 15: CloudJudge uses Nova 2 Lite model ID**
+    - **Validates: Requirements 10.3**
+
+- [x] 4. Checkpoint — Verify model migration
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 5. Migrate RAGSystem to Nova Multimodal Embeddings
+  - [x] 5.1 Update `src/rag/RAGSystem.py` `_generate_text_embedding` to use Nova Multimodal Embeddings
+    - Call `invoke_model` with `modelId="amazon.nova-2-multimodal-embeddings-v1:0"`
+    - Request body: `taskType="SINGLE_EMBEDDING"`, `embeddingPurpose="GENERIC_INDEX"`, `outputEmbeddingLength=1024`
+    - Parse `embedding` from response body
+    - _Requirements: 11.2_
+  - [x] 5.2 Update `src/rag/RAGSystem.py` `_generate_image_embedding` to use Nova Multimodal Embeddings
+    - Call `invoke_model` with `modelId="amazon.nova-2-multimodal-embeddings-v1:0"`
+    - Encode image bytes as base64 string in `inputImage` field
+    - Request body: `taskType="SINGLE_EMBEDDING"`, `embeddingPurpose="GENERIC_INDEX"`, `outputEmbeddingLength=1024`
+    - Remove any CLIP/sentence-transformers imports and usage
+    - _Requirements: 11.3_
+  - [ ]* 5.3 Write property tests for RAG embedding request format and dimension consistency
+    - **Property 16: RAG text embedding request format**
+    - **Property 17: RAG image embedding request format**
+    - **Property 18: Embedding dimension consistency**
+    - **Validates: Requirements 11.2, 11.3, 11.4**
+
+- [x] 6. Integrate Nova 2 Sonic in GuidanceAgent
+  - [x] 6.1 Update `src/agents/GuidanceAgent.py` `process_voice_command` to use Nova 2 Sonic speech-to-speech
+    - Send audio bytes to Nova 2 Sonic via Bedrock API
+    - Receive text transcription and audio response bytes
+    - Return `VoiceResponse` with `transcription`, `audio_response`, and `requires_human_escalation` fields
+    - Support streaming audio response chunks
+    - _Requirements: 12.1, 12.2, 12.3_
+  - [x] 6.2 Ensure `_call_nova_sonic_text` text-only fallback works with Nova 2 Sonic
+    - Verify text-only path returns valid string response when no audio input is available
+    - _Requirements: 12.4_
+  - [ ]* 6.3 Write property tests for voice command and text fallback
+    - **Property 19: Voice command produces VoiceResponse with transcription and audio**
+    - **Property 20: Text-only fallback returns valid response**
+    - **Validates: Requirements 12.2, 12.4**
+
+- [x] 7. Checkpoint — Verify all agent and RAG migrations
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 8. Create Chainlit application entry point and core message handling
+  - [x] 8.1 Create `chainlit_app.py` at project root with `@cl.on_chat_start` handler
+    - Initialize `OrchestrationLayer(enable_validation=True)`
+    - Store orchestration instance in `cl.user_session`
+    - Generate unique `session_id` and store in session
+    - Send welcome message: "Welcome to Ghostwrench AFE. Describe your issue or upload an equipment photo."
+    - Define `SESSION_STORE: Dict[str, Any] = {}` for in-memory session persistence
+    - Define `SUPPORTED_IMAGE_FORMATS = {"image/jpeg", "image/png", "image/bmp", "image/tiff"}`
+    - _Requirements: 1.1, 7.1, 9.2, 9.3_
+  - [x] 8.2 Implement `@cl.on_message` handler for text message routing
+    - Build `FieldRequest` with `request_type=RequestType.DIAGNOSIS`, session_id, and message text
+    - Forward to `OrchestrationLayer.process_field_request`
+    - Display agent responses as chat messages
+    - Wrap in try/except to catch unhandled exceptions and display user-friendly error (no tracebacks)
+    - Log full exception details via `logger.error`
+    - _Requirements: 1.2, 1.3, 1.4_
+  - [ ]* 8.3 Write property tests for text message handling and error handling
+    - **Property 1: Text message produces valid FieldRequest**
+    - **Property 4: Exceptions produce user-friendly errors**
+    - **Validates: Requirements 1.2, 1.4**
+
+- [x] 9. Implement image upload handling in Chainlit app
+  - [x] 9.1 Add file upload handler in `chainlit_app.py` `on_message`
+    - Check `message.elements` for file attachments
+    - Validate MIME type against `SUPPORTED_IMAGE_FORMATS`
+    - Reject unsupported formats with message listing supported formats (JPEG, PNG, BMP, TIFF)
+    - Read image bytes and construct `ImageData` with generated `image_id`, raw bytes, and current timestamp
+    - Include `ImageData` in `FieldRequest.image_data` before forwarding to orchestration
+    - _Requirements: 2.1, 2.2, 2.3_
+  - [x] 9.2 Add annotated image rendering in chat
+    - When `DiagnosisResult` contains an `AnnotatedImage`, render it inline using `cl.Image`
+    - _Requirements: 2.4_
+  - [ ]* 9.3 Write property tests for image upload validation
+    - **Property 2: Image upload produces FieldRequest with ImageData**
+    - **Property 3: Unsupported image formats are rejected**
+    - **Validates: Requirements 2.1, 2.2, 2.3**
+
+- [x] 10. Implement workflow phase visualization with Chainlit Steps
+  - [x] 10.1 Create `handle_phase_step` function using `cl.Step` for phase tracking
+    - Create a Chainlit `Step` with phase name in uppercase as title (INTAKE, DIAGNOSIS, PROCUREMENT, GUIDANCE, COMPLETION)
+    - Show loading indicator while phase is in progress
+    - Update step output with phase summary on completion
+    - _Requirements: 3.1, 3.2, 3.3_
+  - [x] 10.2 Implement `format_phase_summary` for DIAGNOSIS and PROCUREMENT phases
+    - DIAGNOSIS summary: include issue_type, severity, confidence score, root_cause, recommended actions
+    - PROCUREMENT summary: include part count, total_cost, estimated_delivery_date
+    - _Requirements: 3.4, 3.5_
+  - [x] 10.3 Implement streaming status updates during long operations
+    - Stream intermediate messages during DiagnosisAgent processing ("Analyzing image...", "Identifying components...", "Generating diagnosis...")
+    - Stream progress during ActionAgent procurement ("Searching inventory...", "Generating purchase request...")
+    - Display GuidanceSteps sequentially as individual messages with step_number, instruction, safety_checks, expected_outcome
+    - _Requirements: 5.1, 5.2, 5.3_
+  - [ ]* 10.4 Write property tests for phase mapping and formatting
+    - **Property 5: WorkflowPhase maps to correct Step title**
+    - **Property 6: Phase result summaries contain required fields**
+    - **Property 9: GuidanceStep formatting contains required fields**
+    - **Validates: Requirements 3.1, 3.4, 3.5, 5.3**
+
+- [x] 11. Implement escalation handling through chat
+  - [x] 11.1 Create `handle_escalation` function with `cl.AskUserMessage`
+    - Format safety escalation: violation details, precautions, PPE requirements, acknowledgment prompt
+    - Format budget escalation: total cost, budget limit, approval level, approve/reject/alternatives options
+    - Format confidence escalation: low-confidence diagnosis details, confidence score, confirm/reject/re-diagnose options
+    - _Requirements: 4.1, 4.2, 4.3_
+  - [x] 11.2 Wire escalation responses to `OrchestrationLayer.resolve_escalation`
+    - Forward user's resolution response with matching escalation ID
+    - Resume workflow after resolution
+    - _Requirements: 4.4_
+  - [x] 11.3 Implement escalation timeout reminder (5-minute threshold)
+    - Background task checks escalation timestamps
+    - Send reminder message if unresolved for >5 minutes
+    - _Requirements: 4.5_
+  - [ ]* 11.4 Write property tests for escalation message formatting and response forwarding
+    - **Property 7: Escalation messages contain required fields per type**
+    - **Property 8: Escalation responses are forwarded to resolve_escalation**
+    - **Validates: Requirements 4.1, 4.2, 4.3, 4.4**
+
+- [x] 12. Checkpoint — Verify Chainlit core functionality
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 13. Implement voice guidance integration in Chainlit app
+  - [x] 13.1 Add audio input/output handlers using `@cl.on_audio_chunk` and `@cl.on_audio_end`
+    - Activate audio input widget when workflow enters GUIDANCE phase
+    - Capture audio bytes from Field_Technician voice commands
+    - Forward audio bytes to `GuidanceAgent.process_voice_command`
+    - Display transcription text in chat
+    - Play audio response through `cl.Audio` element
+    - _Requirements: 6.1, 6.2, 6.3_
+  - [x] 13.2 Handle voice escalation flag
+    - When `VoiceResponse.requires_human_escalation` is True, pause voice guidance and display escalation prompt
+    - _Requirements: 6.4_
+  - [ ]* 13.3 Write property test for voice escalation handling
+    - **Property 10: VoiceResponse escalation flag triggers escalation prompt**
+    - **Validates: Requirements 6.4**
+
+- [x] 14. Implement session persistence and resumption
+  - [x] 14.1 Implement `save_session` and `load_session` functions in `chainlit_app.py`
+    - `save_session(session_id, workflow_state)` stores state in `SESSION_STORE` dict
+    - `load_session(session_id)` retrieves state from `SESSION_STORE`
+    - Use `asyncio.Lock` per session_id for thread-safe writes
+    - _Requirements: 7.1, 7.2_
+  - [x] 14.2 Add reconnection logic in `@cl.on_chat_start`
+    - Check for existing session ID on reconnect
+    - Restore `WorkflowState` and display current phase
+    - Re-display pending escalation prompts if any unresolved escalations exist
+    - If session not found, create new session and inform user
+    - _Requirements: 7.2, 7.3_
+  - [ ]* 14.3 Write property tests for session persistence
+    - **Property 11: Session IDs are unique**
+    - **Property 12: Session persistence round-trip**
+    - **Validates: Requirements 7.1, 7.2**
+
+- [x] 15. Create mock inventory portal for Nova Act demo
+  - [x] 15.1 Create `mock_portal/index.html` — single-page inventory portal
+    - Search input field for part numbers/descriptions
+    - Results table showing part name, stock, price, lead time
+    - "Add to Cart" button and "Submit Purchase Request" button
+    - Minimal styling, functional for browser automation
+    - _Requirements: 13.1_
+  - [x] 15.2 Create `mock_portal/server.py` — simple Python HTTP server
+    - Serve `index.html` on a configurable port
+    - Handle search queries and return mock inventory data
+    - _Requirements: 13.1_
+  - [x] 15.3 Implement `ActionAgent._navigate_inventory_portal` method in `src/agents/ActionAgent.py`
+    - Use Nova Act browser automation API to open mock portal URL
+    - Type required part number into search field
+    - Read search results from page
+    - Click "Add to Cart" for matching part
+    - Click "Submit Purchase Request"
+    - Capture screenshot at each interaction step (search, add-to-cart, submit)
+    - Forward screenshots to Chainlit for inline display in PROCUREMENT Step
+    - Fall back to existing tool-calling procurement flow if portal is unavailable
+    - _Requirements: 13.2, 13.3, 13.4_
+  - [ ]* 15.4 Write property tests for Nova Act portal fallback and screenshot capture
+    - **Property 21: Nova Act portal fallback on unavailability**
+    - **Property 22: Nova Act portal screenshots captured at each step**
+    - **Validates: Requirements 13.3, 13.4**
+
+- [x] 16. Implement demo mode controller
+  - [x] 16.1 Add demo mode detection and flow in `chainlit_app.py`
+    - Detect "demo" as first message to trigger guided demo flow
+    - Create `FieldRequest` with pre-configured sample data (known equipment image, site context, technician ID)
+    - Run through all 5 phases using `OrchestrationLayer.process_field_request` (real pipeline, not mocked)
+    - Display model annotation messages before each phase (e.g., "🔍 DiagnosisAgent powered by Amazon Nova 2 Lite")
+    - Format GUIDANCE steps with highlighted safety warnings
+    - Display Nova Act annotation before PROCUREMENT phase
+    - _Requirements: 8.1, 8.2, 8.3, 13.5_
+  - [x] 16.2 Implement demo summary card at completion
+    - Display summary card listing all Amazon Nova models used (Nova 2 Lite, Nova Act, Nova 2 Sonic, Nova Multimodal Embeddings, Claude 3.5 Sonnet)
+    - List hackathon categories covered (Agentic AI, Multimodal Understanding, Voice AI)
+    - _Requirements: 8.5_
+  - [ ]* 16.3 Write property test for demo annotations
+    - **Property 13: Demo annotations contain agent and model names**
+    - **Validates: Requirements 8.2**
+
+- [x] 17. Checkpoint — Verify full integration
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 18. Create test infrastructure and hypothesis strategies
+  - [x] 18.1 Create `tests/strategies/chainlit_strategies.py` with custom Hypothesis strategies
+    - `text_messages()` — non-empty strings for chat messages
+    - `image_bytes()` — valid JPEG/PNG byte sequences
+    - `unsupported_mime_types()` — MIME types not in supported set
+    - `diagnosis_results()` — valid `DiagnosisResult` instances
+    - `procurement_states()` — valid `ProcurementState` instances
+    - `escalation_data()` — safety/budget/confidence escalation data
+    - `guidance_steps()` — valid `GuidanceStep` instances
+    - `workflow_phases()` — samples from `WorkflowPhase` enum
+    - `workflow_states()` — valid `WorkflowState` instances
+    - `voice_responses()` — valid `VoiceResponse` instances
+    - Create `tests/strategies/__init__.py`
+    - _Requirements: All (testing infrastructure)_
+  - [ ]* 18.2 Write `tests/test_chainlit_properties.py` with all 22 property-based tests
+    - Each test uses `@given` with custom strategies from `chainlit_strategies.py`
+    - Each test tagged with `# Feature: chainlit-ui-integration, Property N: <title>`
+    - Minimum 100 examples per test (`@settings(max_examples=100)`)
+    - Properties 1–22 as defined in design document
+    - _Requirements: All (cross-cutting validation)_
+  - [ ]* 18.3 Write `tests/test_chainlit_unit.py` with unit tests
+    - App initialization creates OrchestrationLayer and sends welcome message (Req 1.1)
+    - "demo" as first message triggers demo flow (Req 8.1)
+    - Demo summary card contains all 5 model names and hackathon categories (Req 8.5)
+    - Voice command forwarding to GuidanceAgent (Req 6.2)
+    - Config values read from environment variables (Req 9.2)
+    - `config.py` contains correct model ID constants (Req 10.1, 11.1)
+    - `requirements.txt` includes chainlit, excludes sentence-transformers (Req 9.1, 11.5)
+    - Escalation reminder triggers after 5-minute timeout (Req 4.5)
+    - Reconnection with unresolved escalations re-displays prompts (Req 7.3)
+    - _Requirements: 1.1, 4.5, 6.2, 7.3, 8.1, 8.5, 9.1, 9.2, 10.1, 11.1, 11.5_
+  - [ ]* 18.4 Write `tests/test_chainlit_integration.py` with integration tests
+    - Full workflow: message → FieldRequest → OrchestrationLayer → response displayed
+    - Image upload → DiagnosisAgent receives ImageData → AnnotatedImage rendered
+    - Escalation flow: CloudJudge triggers → prompt displayed → user responds → workflow resumes
+    - Demo mode: "demo" → all 5 phases complete with annotations
+    - Session persistence: create session → disconnect → reconnect → state restored
+    - Mock Bedrock API calls (`converse`, `invoke_model`) with realistic response structures
+    - Mock Chainlit framework (`cl.Message`, `cl.Step`, `cl.AskUserMessage`)
+    - _Requirements: 1.2, 2.1, 4.4, 7.2, 8.1_
+
+- [x] 19. Final checkpoint — Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [ ]* 20. Hackathon submission preparation
+  - [ ]* 20.1 Grant judge access to GitHub repository
+    - Add `testing@devpost.com` and `Amazon-Nova-hackathon@amazon.com` as collaborators on the `edidionghectorumoh/GhostWrench-` GitHub repo
+    - Verify both accounts have read access to the repository
+    - _Requirements: Hackathon submission rules_
+  - [ ]* 20.2 Draft blog post outline for builder.aws.com (bonus prize)
+    - Write outline covering: project purpose, how it leverages Amazon Nova models, target community impact (field technicians / industrial maintenance), real-world application benefits, adoption plans
+    - Include sections on safety-first architecture, multi-agent orchestration, and Nova model portfolio usage
+    - _Requirements: Hackathon bonus prize_
+  - [ ]* 20.3 Prepare submission text description
+    - Write brief project summary for Devpost submission
+    - Highlight all Amazon Nova models used: Nova 2 Lite, Nova Act, Nova 2 Sonic, Nova Multimodal Embeddings
+    - Reference hackathon categories: Agentic AI, Multimodal Understanding, Voice AI
+    - Include #AmazonNova hashtag reference for demo video
+    - _Requirements: Hackathon submission rules_
+
+## Notes
+
+- Tasks marked with `*` are optional and can be skipped for faster MVP
+- Each task references specific requirements for traceability
+- Checkpoints ensure incremental validation after each major milestone
+- Property tests validate universal correctness properties from the design document
+- Unit tests validate specific examples and edge cases
+- The design uses Python throughout — all implementation tasks target Python
+- All 22 correctness properties from the design are covered across tasks 2.2, 3.2, 5.3, 6.3, 8.3, 9.3, 10.4, 11.4, 13.3, 14.3, 15.4, 16.3, and 18.2

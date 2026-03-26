@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ghostwrench Parts Inventory Portal</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #f5f5f5; padding: 1.5rem; }
+    h1 { margin-bottom: 1rem; color: #1a1a2e; }
+    .search-bar { display: flex; gap: .5rem; margin-bottom: 1rem; }
+    .search-bar input { flex: 1; padding: .5rem; font-size: 1rem; border: 1px solid #ccc; border-radius: 4px; }
+    .search-bar button { padding: .5rem 1rem; font-size: 1rem; background: #0f3460; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 6px; overflow: hidden; }
+    th, td { text-align: left; padding: .6rem .8rem; border-bottom: 1px solid #eee; }
+    th { background: #16213e; color: #fff; }
+    .btn { padding: .35rem .7rem; border: none; border-radius: 4px; cursor: pointer; font-size: .85rem; }
+    .btn-add { background: #e94560; color: #fff; }
+    .btn-submit { background: #0f3460; color: #fff; margin-top: 1rem; padding: .5rem 1.5rem; font-size: 1rem; }
+    #cart-section { margin-top: 1.5rem; }
+    #status { margin-top: 1rem; padding: .5rem; color: green; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>🔧 Ghostwrench Parts Inventory</h1>
+
+  <div class="search-bar">
+    <input id="search-input" type="text" placeholder="Search by part number or description…" />
+    <button id="search-btn" onclick="searchParts()">Search</button>
+  </div>
+
+  <table id="results-table">
+    <thead><tr><th>Part Number</th><th>Description</th><th>Stock</th><th>Price</th><th>Lead Time</th><th></th></tr></thead>
+    <tbody id="results-body"></tbody>
+  </table>
+
+  <div id="cart-section">
+    <h2>Cart</h2>
+    <ul id="cart-list"></ul>
+    <button class="btn btn-submit" id="submit-btn" onclick="submitPurchase()">Submit Purchase Request</button>
+  </div>
+
+  <div id="status"></div>
+
+  <script>
+    const INVENTORY = [
+      { part: "NS-2960X-24TS-L", desc: "Cisco Catalyst 2960-X 24 Port Switch", stock: 15, price: 1250, lead: "2 days" },
+      { part: "NS-2960X-48TS-L", desc: "Cisco Catalyst 2960-X 48 Port Switch", stock: 8, price: 1850, lead: "3 days" },
+      { part: "FAN-MOD-4HS",     desc: "High-Speed Fan Module",                 stock: 22, price: 320,  lead: "1 day"  },
+      { part: "PWR-C1-1100WAC",  desc: "1100W AC Power Supply",                 stock: 5,  price: 780,  lead: "4 days" },
+      { part: "SFP-10G-SR",      desc: "10GBASE-SR SFP+ Transceiver",           stock: 40, price: 150,  lead: "1 day"  },
+    ];
+
+    const cart = [];
+
+    function searchParts() {
+      const q = document.getElementById("search-input").value.toLowerCase();
+      const tbody = document.getElementById("results-body");
+      tbody.innerHTML = "";
+      const matches = INVENTORY.filter(i => i.part.toLowerCase().includes(q) || i.desc.toLowerCase().includes(q));
+      matches.forEach((item, idx) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td>${item.part}</td><td>${item.desc}</td><td>${item.stock}</td><td>$${item.price}</td><td>${item.lead}</td>
+          <td><button class="btn btn-add" onclick="addToCart(${idx}, this)">Add to Cart</button></td>`;
+        tbody.appendChild(tr);
+      });
+      if (!matches.length) {
+        tbody.innerHTML = '<tr><td colspan="6">No results found.</td></tr>';
+      }
+    }
+
+    function addToCart(idx, btn) {
+      const filtered = INVENTORY.filter(i => {
+        const q = document.getElementById("search-input").value.toLowerCase();
+        return i.part.toLowerCase().includes(q) || i.desc.toLowerCase().includes(q);
+      });
+      const item = filtered[idx];
+      if (!item) return;
+      cart.push(item);
+      btn.textContent = "Added ✓";
+      btn.disabled = true;
+      renderCart();
+    }
+
+    function renderCart() {
+      const ul = document.getElementById("cart-list");
+      ul.innerHTML = "";
+      cart.forEach(item => {
+        const li = document.createElement("li");
+        li.textContent = `${item.part} — $${item.price}`;
+        ul.appendChild(li);
+      });
+    }
+
+    function submitPurchase() {
+      if (!cart.length) { alert("Cart is empty."); return; }
+      const total = cart.reduce((s, i) => s + i.price, 0);
+      document.getElementById("status").textContent =
+        `✅ Purchase request submitted — ${cart.length} part(s), total $${total}. Request ID: PR-${Date.now()}`;
+      cart.length = 0;
+      renderCart();
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,80 @@
+{
+  "metrics": {
+    "namespace": "AutonomousFieldEngineer",
+    "metrics_collected": {
+      "diagnosis_latency": {
+        "measurement": [
+          {
+            "name": "diagnosis_duration_ms",
+            "unit": "Milliseconds"
+          }
+        ],
+        "metrics_collection_interval": 60
+      },
+      "inventory_search_latency": {
+        "measurement": [
+          {
+            "name": "inventory_search_duration_ms",
+            "unit": "Milliseconds"
+          }
+        ],
+        "metrics_collection_interval": 60
+      },
+      "judge_validation_latency": {
+        "measurement": [
+          {
+            "name": "judge_validation_duration_ms",
+            "unit": "Milliseconds"
+          }
+        ],
+        "metrics_collection_interval": 60
+      },
+      "workflow_completion": {
+        "measurement": [
+          {
+            "name": "workflow_duration_ms",
+            "unit": "Milliseconds"
+          },
+          {
+            "name": "workflow_success_count",
+            "unit": "Count"
+          },
+          {
+            "name": "workflow_failure_count",
+            "unit": "Count"
+          }
+        ],
+        "metrics_collection_interval": 60
+      },
+      "escalations": {
+        "measurement": [
+          {
+            "name": "escalation_count",
+            "unit": "Count"
+          }
+        ],
+        "metrics_collection_interval": 60,
+        "dimensions": [
+          ["escalation_type"],
+          ["escalation_level"]
+        ]
+      }
+    }
+  },
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {
+            "file_path": "/app/audit_logs/judgments.db",
+            "log_group_name": "/aws/afe/audit-logs",
+            "log_stream_name": "{instance_id}/audit",
+            "timezone": "UTC"
+          }
+        ]
+      }
+    },
+    "log_stream_name": "{instance_id}"
+  },
+  "force_flush_interval": 15
+}
